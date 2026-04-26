@@ -480,14 +480,28 @@ function ChatbotPage() {
                 <p className="text-xs text-emerald-600">● Online</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={reset}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-[var(--primary-soft)] hover:text-primary"
-              aria-label="Reset conversation"
-            >
-              <RotateCcw className="h-3.5 w-3.5" /> Reset
-            </button>
+            <div className="flex items-center gap-2">
+              {user ? (
+                <span className="hidden items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 sm:inline-flex">
+                  <Cloud className="h-3 w-3" /> Saved
+                </span>
+              ) : (
+                <Link
+                  to="/auth"
+                  className="hidden items-center gap-1 rounded-full border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-[var(--primary-soft)] hover:text-primary sm:inline-flex"
+                >
+                  <CloudOff className="h-3 w-3" /> Sign in to save
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={reset}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-[var(--primary-soft)] hover:text-primary"
+                aria-label="Reset conversation"
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> Reset
+              </button>
+            </div>
           </div>
 
           {/* Chat area */}
