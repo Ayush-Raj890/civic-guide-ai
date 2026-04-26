@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Layout } from "@/components/Layout";
 import { useState, useRef, useEffect, useMemo } from "react";
 import {
@@ -13,7 +13,11 @@ import {
   X,
   FileText,
   ImageIcon,
+  Cloud,
+  CloudOff,
 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/chatbot")({
   head: () => ({
@@ -157,6 +161,10 @@ function readFileAsDataURL(file) {
 }
 
 function ChatbotPage() {
+  const { user, loading: authLoading } = useAuth();
+  const [conversationId, setConversationId] = useState(null);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+
   const [messages, setMessages] = useState([
     { id: "welcome", role: "bot", text: WELCOME_TEXT, ts: 0 },
   ]);
@@ -171,6 +179,87 @@ function ChatbotPage() {
   const endRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  // Load (or create) the user's most recent conversation when they sign in
+  useEffect(() => {
+    let cancelled = false;
+    async function loadHistory() {
+      if (authLoading) return;
+      if (!user) {
+        setConversationId(null);
+        setHistoryLoaded(true);
+        return;
+      }
+      setHistoryLoaded(false);
+
+      const { data: convos } = await supabase
+        .from("conversations")
+        .select("id")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1);
+
+      let convId = convos?.[0]?.id;
+      if (!convId) {
+        const { data: created, error: createErr } = await supabase
+          .from("conversations")
+          .insert({ user_id: user.id, title: "CivicGuide chat" })
+          .select("id")
+          .single();
+        if (createErr) {
+          if (!cancelled) setError("Couldn't create your conversation.");
+          return;
+        }
+        convId = created.id;
+      }
+
+      const { data: rows } = await supabase
+        .from("messages")
+        .select("id, role, content, created_at")
+        .eq("conversation_id", convId)
+        .order("created_at", { ascending: true });
+
+      if (cancelled) return;
+      setConversationId(convId);
+      if (rows && rows.length) {
+        setMessages(
+          rows.map((r) => ({
+            id: r.id,
+            role: r.role === "assistant" ? "bot" : r.role,
+            text: r.content,
+            ts: new Date(r.created_at).getTime(),
+          })),
+        );
+      } else {
+        setMessages([{ id: "welcome", role: "bot", text: WELCOME_TEXT, ts: 0 }]);
+      }
+      setHistoryLoaded(true);
+    }
+    void loadHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, authLoading]);
+
+  async function persistMessage(role, content) {
+    if (!user || !conversationId) return;
+    const dbRole = role === "bot" ? "assistant" : role;
+    const { error: insertErr } = await supabase.from("messages").insert({
+      conversation_id: conversationId,
+      user_id: user.id,
+      role: dbRole,
+      content,
+    });
+    if (insertErr) {
+      setError("Couldn't save message.");
+      return;
+    }
+    await supabase
+      .from("conversations")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", conversationId);
+  }
+
 
   // Smooth auto-scroll only when user is near bottom
   useEffect(() => {
@@ -255,6 +344,9 @@ function ChatbotPage() {
     setPending([]);
     setTyping(true);
 
+    // Persist user message (best-effort)
+    if (trimmed) void persistMessage("user", trimmed);
+
     const delay = 700 + Math.random() * 700;
     window.setTimeout(() => {
       const replyText = hasAttachments
@@ -278,6 +370,7 @@ function ChatbotPage() {
       setMessages((m) => [...m, botMsg]);
       setSuggestions(followups);
       setTyping(false);
+      void persistMessage("assistant", replyText);
       window.setTimeout(() => inputRef.current?.focus(), 50);
     }, delay);
   }
@@ -287,11 +380,20 @@ function ChatbotPage() {
     send(input);
   }
 
-  function reset() {
+  async function reset() {
     setMessages([{ id: "welcome", role: "bot", text: WELCOME_TEXT, ts: 0 }]);
     setSuggestions(initialSuggestions);
     setPending([]);
     setError(null);
+    // Start a fresh conversation for signed-in users
+    if (user) {
+      const { data: created } = await supabase
+        .from("conversations")
+        .insert({ user_id: user.id, title: "CivicGuide chat" })
+        .select("id")
+        .single();
+      if (created?.id) setConversationId(created.id);
+    }
     inputRef.current?.focus();
   }
 
@@ -378,14 +480,28 @@ function ChatbotPage() {
                 <p className="text-xs text-emerald-600">● Online</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={reset}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-[var(--primary-soft)] hover:text-primary"
-              aria-label="Reset conversation"
-            >
-              <RotateCcw className="h-3.5 w-3.5" /> Reset
-            </button>
+            <div className="flex items-center gap-2">
+              {user ? (
+                <span className="hidden items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 sm:inline-flex">
+                  <Cloud className="h-3 w-3" /> Saved
+                </span>
+              ) : (
+                <Link
+                  to="/auth"
+                  className="hidden items-center gap-1 rounded-full border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-[var(--primary-soft)] hover:text-primary sm:inline-flex"
+                >
+                  <CloudOff className="h-3 w-3" /> Sign in to save
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={reset}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-[var(--primary-soft)] hover:text-primary"
+                aria-label="Reset conversation"
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> Reset
+              </button>
+            </div>
           </div>
 
           {/* Chat area */}
