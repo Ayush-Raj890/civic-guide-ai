@@ -344,6 +344,9 @@ function ChatbotPage() {
     setPending([]);
     setTyping(true);
 
+    // Persist user message (best-effort)
+    if (trimmed) void persistMessage("user", trimmed);
+
     const delay = 700 + Math.random() * 700;
     window.setTimeout(() => {
       const replyText = hasAttachments
@@ -367,6 +370,7 @@ function ChatbotPage() {
       setMessages((m) => [...m, botMsg]);
       setSuggestions(followups);
       setTyping(false);
+      void persistMessage("assistant", replyText);
       window.setTimeout(() => inputRef.current?.focus(), 50);
     }, delay);
   }
@@ -376,11 +380,20 @@ function ChatbotPage() {
     send(input);
   }
 
-  function reset() {
+  async function reset() {
     setMessages([{ id: "welcome", role: "bot", text: WELCOME_TEXT, ts: 0 }]);
     setSuggestions(initialSuggestions);
     setPending([]);
     setError(null);
+    // Start a fresh conversation for signed-in users
+    if (user) {
+      const { data: created } = await supabase
+        .from("conversations")
+        .insert({ user_id: user.id, title: "CivicGuide chat" })
+        .select("id")
+        .single();
+      if (created?.id) setConversationId(created.id);
+    }
     inputRef.current?.focus();
   }
 
