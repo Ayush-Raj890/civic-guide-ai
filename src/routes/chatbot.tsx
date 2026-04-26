@@ -161,6 +161,10 @@ function readFileAsDataURL(file) {
 }
 
 function ChatbotPage() {
+  const { user, loading: authLoading } = useAuth();
+  const [conversationId, setConversationId] = useState(null);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+
   const [messages, setMessages] = useState([
     { id: "welcome", role: "bot", text: WELCOME_TEXT, ts: 0 },
   ]);
@@ -175,6 +179,87 @@ function ChatbotPage() {
   const endRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  // Load (or create) the user's most recent conversation when they sign in
+  useEffect(() => {
+    let cancelled = false;
+    async function loadHistory() {
+      if (authLoading) return;
+      if (!user) {
+        setConversationId(null);
+        setHistoryLoaded(true);
+        return;
+      }
+      setHistoryLoaded(false);
+
+      const { data: convos } = await supabase
+        .from("conversations")
+        .select("id")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1);
+
+      let convId = convos?.[0]?.id;
+      if (!convId) {
+        const { data: created, error: createErr } = await supabase
+          .from("conversations")
+          .insert({ user_id: user.id, title: "CivicGuide chat" })
+          .select("id")
+          .single();
+        if (createErr) {
+          if (!cancelled) setError("Couldn't create your conversation.");
+          return;
+        }
+        convId = created.id;
+      }
+
+      const { data: rows } = await supabase
+        .from("messages")
+        .select("id, role, content, created_at")
+        .eq("conversation_id", convId)
+        .order("created_at", { ascending: true });
+
+      if (cancelled) return;
+      setConversationId(convId);
+      if (rows && rows.length) {
+        setMessages(
+          rows.map((r) => ({
+            id: r.id,
+            role: r.role === "assistant" ? "bot" : r.role,
+            text: r.content,
+            ts: new Date(r.created_at).getTime(),
+          })),
+        );
+      } else {
+        setMessages([{ id: "welcome", role: "bot", text: WELCOME_TEXT, ts: 0 }]);
+      }
+      setHistoryLoaded(true);
+    }
+    void loadHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, authLoading]);
+
+  async function persistMessage(role, content) {
+    if (!user || !conversationId) return;
+    const dbRole = role === "bot" ? "assistant" : role;
+    const { error: insertErr } = await supabase.from("messages").insert({
+      conversation_id: conversationId,
+      user_id: user.id,
+      role: dbRole,
+      content,
+    });
+    if (insertErr) {
+      setError("Couldn't save message.");
+      return;
+    }
+    await supabase
+      .from("conversations")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", conversationId);
+  }
+
 
   // Smooth auto-scroll only when user is near bottom
   useEffect(() => {
