@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Layout } from "@/components/Layout";
 import { useState, useRef, useEffect, useMemo } from "react";
 import {
@@ -13,7 +13,11 @@ import {
   X,
   FileText,
   ImageIcon,
+  Cloud,
+  CloudOff,
 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/chatbot")({
   head: () => ({
