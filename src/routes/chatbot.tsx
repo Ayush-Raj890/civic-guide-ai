@@ -1,7 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Layout } from "@/components/Layout";
-import { useState, useRef, useEffect, useMemo, type FormEvent } from "react";
-import { Send, Bot, User, Sparkles, RotateCcw, CheckCheck } from "lucide-react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  type FormEvent,
+  type ChangeEvent,
+} from "react";
+import {
+  Send,
+  Bot,
+  User,
+  Sparkles,
+  RotateCcw,
+  CheckCheck,
+  Paperclip,
+  X,
+  FileText,
+  ImageIcon,
+} from "lucide-react";
 
 export const Route = createFileRoute("/chatbot")({
   head: () => ({
@@ -22,19 +40,26 @@ export const Route = createFileRoute("/chatbot")({
   component: ChatbotPage,
 });
 
+type Attachment = {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  // data URL for previews / persistence inside the demo session
+  url: string;
+  kind: "image" | "file";
+};
+
 type Message = {
   id: string;
   role: "user" | "bot";
   text: string;
   ts: number;
+  attachments?: Attachment[];
 };
 
-const STARTER: Message = {
-  id: "welcome",
-  role: "bot",
-  text: "Hi! I'm **CivicGuide AI** 🗳️ — ask me anything about voting, registration, or how elections work.",
-  ts: Date.now(),
-};
+const WELCOME_TEXT =
+  "Hi! I'm **CivicGuide AI** 🗳️ — ask me anything about voting, registration, or how elections work. You can also attach a screenshot or document and I'll reference it.";
 
 // Keyword-matched mock replies for a smarter feel
 const knowledgeBase: { keywords: string[]; reply: string; followups: string[] }[] = [
@@ -92,6 +117,9 @@ const initialSuggestions = [
   "When are results announced?",
 ];
 
+const MAX_FILES = 4;
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+
 function findReply(text: string): { reply: string; followups: string[] } {
   const lower = text.toLowerCase();
   for (const entry of knowledgeBase) {
@@ -102,57 +130,178 @@ function findReply(text: string): { reply: string; followups: string[] } {
   return { reply: fallbackReply, followups: initialSuggestions };
 }
 
+function buildAttachmentReply(attachments: Attachment[], text: string): string {
+  const imgs = attachments.filter((a) => a.kind === "image");
+  const docs = attachments.filter((a) => a.kind === "file");
+  const parts: string[] = [];
+
+  if (imgs.length && docs.length) {
+    parts.push(
+      `Thanks for sharing **${imgs.length} image${imgs.length > 1 ? "s" : ""}** and **${docs.length} document${docs.length > 1 ? "s" : ""}**.`,
+    );
+  } else if (imgs.length) {
+    parts.push(
+      `Thanks for the screenshot${imgs.length > 1 ? "s" : ""} — I can see *${imgs.map((a) => a.name).join(", ")}*.`,
+    );
+  } else if (docs.length) {
+    parts.push(
+      `Got your document${docs.length > 1 ? "s" : ""}: *${docs.map((a) => a.name).join(", ")}*.`,
+    );
+  }
+
+  if (text.trim()) {
+    const { reply } = findReply(text);
+    parts.push(reply);
+  } else {
+    parts.push(
+      "In a live deployment I'd analyze the contents and pull out the relevant election info. For now, tell me **what you'd like me to look for** — for example *“Is this a valid voter ID?”* or *“Summarize this registration form.”*",
+    );
+  }
+
+  return parts.join("\n\n");
+}
+
 function formatTime(ts: number) {
   return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function formatBytes(n: number) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function readFileAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 function ChatbotPage() {
-  const [messages, setMessages] = useState<Message[]>([STARTER]);
+  const [messages, setMessages] = useState<Message[]>([
+    { id: "welcome", role: "bot", text: WELCOME_TEXT, ts: 0 },
+  ]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>(initialSuggestions);
+  const [pending, setPending] = useState<Attachment[]>([]);
+  const [dragOver, setDragOver] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Smooth auto-scroll only when user is near bottom
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    if (distanceFromBottom < 160) {
+    if (distanceFromBottom < 200) {
       endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }
-  }, [messages, typing]);
+  }, [messages, typing, pending.length]);
+
+  // Auto-clear error after a moment
+  useEffect(() => {
+    if (!error) return;
+    const t = window.setTimeout(() => setError(null), 3500);
+    return () => window.clearTimeout(t);
+  }, [error]);
+
+  async function handleFiles(fileList: FileList | File[]) {
+    const incoming = Array.from(fileList);
+    if (!incoming.length) return;
+
+    const remainingSlots = MAX_FILES - pending.length;
+    if (remainingSlots <= 0) {
+      setError(`You can attach up to ${MAX_FILES} files per message.`);
+      return;
+    }
+
+    const accepted: Attachment[] = [];
+    for (const file of incoming.slice(0, remainingSlots)) {
+      if (file.size > MAX_FILE_SIZE) {
+        setError(`"${file.name}" is larger than 5 MB.`);
+        continue;
+      }
+      try {
+        const url = await readFileAsDataURL(file);
+        accepted.push({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          name: file.name,
+          size: file.size,
+          type: file.type || "application/octet-stream",
+          url,
+          kind: file.type.startsWith("image/") ? "image" : "file",
+        });
+      } catch {
+        setError(`Couldn't read "${file.name}".`);
+      }
+    }
+
+    if (incoming.length > remainingSlots) {
+      setError(`Only the first ${remainingSlots} file(s) were attached (max ${MAX_FILES}).`);
+    }
+
+    if (accepted.length) setPending((p) => [...p, ...accepted]);
+  }
+
+  function onPickFiles(e: ChangeEvent<HTMLInputElement>) {
+    if (e.target.files) void handleFiles(e.target.files);
+    // Reset so picking the same file again still triggers change
+    e.target.value = "";
+  }
+
+  function removePending(id: string) {
+    setPending((p) => p.filter((a) => a.id !== id));
+  }
 
   function send(text: string) {
     const trimmed = text.trim();
-    if (!trimmed || typing) return;
+    const hasAttachments = pending.length > 0;
+    if ((!trimmed && !hasAttachments) || typing) return;
 
+    const attachments = pending;
     const userMsg: Message = {
       id: `u-${Date.now()}`,
       role: "user",
       text: trimmed,
       ts: Date.now(),
+      attachments: attachments.length ? attachments : undefined,
     };
     setMessages((m) => [...m, userMsg]);
     setInput("");
+    setPending([]);
     setTyping(true);
 
-    // Simulate variable latency for realism
     const delay = 700 + Math.random() * 700;
     window.setTimeout(() => {
-      const { reply, followups } = findReply(trimmed);
+      const replyText = hasAttachments
+        ? buildAttachmentReply(attachments, trimmed)
+        : findReply(trimmed).reply;
+      const followups = hasAttachments
+        ? [
+            "Is this document valid?",
+            "Summarize the key details",
+            "What information is missing?",
+            "Where do I submit this?",
+          ]
+        : findReply(trimmed).followups;
+
       const botMsg: Message = {
         id: `b-${Date.now()}`,
         role: "bot",
-        text: reply,
+        text: replyText,
         ts: Date.now(),
       };
       setMessages((m) => [...m, botMsg]);
       setSuggestions(followups);
       setTyping(false);
-      // Restore focus to input after reply
       window.setTimeout(() => inputRef.current?.focus(), 50);
     }, delay);
   }
@@ -163,9 +312,26 @@ function ChatbotPage() {
   }
 
   function reset() {
-    setMessages([{ ...STARTER, ts: Date.now() }]);
+    setMessages([{ id: "welcome", role: "bot", text: WELCOME_TEXT, ts: 0 }]);
     setSuggestions(initialSuggestions);
+    setPending([]);
+    setError(null);
     inputRef.current?.focus();
+  }
+
+  // Drag-and-drop
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files?.length) void handleFiles(e.dataTransfer.files);
+  }
+  function onDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    if (!dragOver) setDragOver(true);
+  }
+  function onDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
   }
 
   // Group consecutive messages from the same role for tighter bubbles
@@ -204,7 +370,24 @@ function ChatbotPage() {
           </p>
         </div>
 
-        <div className="mt-10 overflow-hidden rounded-3xl border border-border bg-card shadow-[var(--shadow-soft)]">
+        <div
+          className={`relative mt-10 overflow-hidden rounded-3xl border bg-card shadow-[var(--shadow-soft)] transition-colors ${
+            dragOver ? "border-primary ring-2 ring-primary/30" : "border-border"
+          }`}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+        >
+          {/* Drag overlay */}
+          {dragOver && (
+            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[var(--primary-soft)]/80 backdrop-blur-sm">
+              <div className="rounded-2xl border-2 border-dashed border-primary bg-card px-6 py-4 text-center shadow-[var(--shadow-soft)]">
+                <Paperclip className="mx-auto h-6 w-6 text-primary" />
+                <p className="mt-1 text-sm font-semibold text-primary">Drop to attach</p>
+              </div>
+            </div>
+          )}
+
           {/* Chat header */}
           <div className="flex items-center justify-between gap-3 border-b border-border bg-card px-5 py-3">
             <div className="flex items-center gap-3">
@@ -241,8 +424,24 @@ function ChatbotPage() {
             <div ref={endRef} />
           </div>
 
+          {/* Pending attachments preview */}
+          {pending.length > 0 && (
+            <div className="flex flex-wrap gap-2 border-t border-border bg-card px-4 py-3">
+              {pending.map((a) => (
+                <PendingChip key={a.id} attachment={a} onRemove={() => removePending(a.id)} />
+              ))}
+            </div>
+          )}
+
+          {/* Error banner */}
+          {error && (
+            <div className="border-t border-destructive/30 bg-destructive/10 px-4 py-2 text-xs font-medium text-destructive">
+              {error}
+            </div>
+          )}
+
           {/* Suggestions */}
-          {suggestions.length > 0 && (
+          {suggestions.length > 0 && pending.length === 0 && (
             <div className="flex flex-wrap gap-2 border-t border-border bg-card px-4 py-3">
               <span className="self-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Try asking:
@@ -267,16 +466,39 @@ function ChatbotPage() {
             className="flex items-center gap-2 border-t border-border bg-card p-3"
           >
             <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,.pdf,.doc,.docx,.txt,.csv"
+              onChange={onPickFiles}
+              className="sr-only"
+              aria-hidden
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={typing || pending.length >= MAX_FILES}
+              className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border bg-secondary text-muted-foreground transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-[var(--primary-soft)] hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+              aria-label="Attach file"
+              title="Attach a screenshot or document"
+            >
+              <Paperclip className="h-5 w-5" />
+            </button>
+            <input
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your question…"
+              placeholder={
+                pending.length
+                  ? "Add a question about your attachment…"
+                  : "Type your question or drop a file…"
+              }
               className="flex-1 rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
               autoComplete="off"
             />
             <button
               type="submit"
-              disabled={!input.trim() || typing}
+              disabled={(!input.trim() && pending.length === 0) || typing}
               className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-[var(--shadow-soft)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
               aria-label="Send message"
             >
@@ -286,7 +508,8 @@ function ChatbotPage() {
         </div>
 
         <p className="mt-4 text-center text-xs text-muted-foreground">
-          Demo assistant · Responses are illustrative and may not reflect your local rules.
+          Demo assistant · Attach screenshots or documents (max {MAX_FILES} files, 5 MB each).
+          Files stay in your browser.
         </p>
       </section>
     </Layout>
@@ -297,8 +520,9 @@ type GroupedMessage = Message & { isFirstOfGroup: boolean; isLastOfGroup: boolea
 
 function MessageBubble({ message }: { message: GroupedMessage }) {
   const isUser = message.role === "user";
-  // Lightweight markdown: **bold** and *italic*
   const html = renderInlineMarkdown(message.text);
+  const hasText = message.text.trim().length > 0;
+  const hasAttachments = !!message.attachments?.length;
 
   return (
     <div
@@ -309,23 +533,65 @@ function MessageBubble({ message }: { message: GroupedMessage }) {
       <div className={`w-9 shrink-0 ${message.isLastOfGroup ? "" : "invisible"}`}>
         <Avatar role={message.role} />
       </div>
-      <div className={`flex max-w-[75%] flex-col ${isUser ? "items-end" : "items-start"}`}>
-        <div
-          className={`px-4 py-2.5 text-sm leading-relaxed shadow-[var(--shadow-card)] ${
-            isUser
-              ? "bg-[image:var(--gradient-primary)] text-primary-foreground"
-              : "bg-card text-foreground"
-          } ${bubbleRadius(isUser, message.isFirstOfGroup, message.isLastOfGroup)}`}
-        >
-          <span dangerouslySetInnerHTML={{ __html: html }} />
-        </div>
+      <div className={`flex max-w-[75%] flex-col gap-1.5 ${isUser ? "items-end" : "items-start"}`}>
+        {hasAttachments && (
+          <div className={`flex flex-wrap gap-1.5 ${isUser ? "justify-end" : ""}`}>
+            {message.attachments!.map((a) =>
+              a.kind === "image" ? (
+                <a
+                  key={a.id}
+                  href={a.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block overflow-hidden rounded-2xl border border-border shadow-[var(--shadow-card)] transition-transform hover:-translate-y-0.5"
+                >
+                  <img
+                    src={a.url}
+                    alt={a.name}
+                    className="max-h-56 max-w-[240px] object-cover"
+                  />
+                </a>
+              ) : (
+                <a
+                  key={a.id}
+                  href={a.url}
+                  download={a.name}
+                  className={`flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs shadow-[var(--shadow-card)] transition-colors ${
+                    isUser
+                      ? "border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                      : "border-border bg-card text-foreground hover:bg-secondary"
+                  }`}
+                >
+                  <FileText className="h-4 w-4 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{a.name}</p>
+                    <p className={`text-[10px] ${isUser ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                      {formatBytes(a.size)}
+                    </p>
+                  </div>
+                </a>
+              ),
+            )}
+          </div>
+        )}
+        {hasText && (
+          <div
+            className={`px-4 py-2.5 text-sm leading-relaxed shadow-[var(--shadow-card)] ${
+              isUser
+                ? "bg-[image:var(--gradient-primary)] text-primary-foreground"
+                : "bg-card text-foreground"
+            } ${bubbleRadius(isUser, message.isFirstOfGroup, message.isLastOfGroup)}`}
+          >
+            <span dangerouslySetInnerHTML={{ __html: html }} />
+          </div>
+        )}
         {message.isLastOfGroup && (
           <div
-            className={`mt-1 flex items-center gap-1 px-1 text-[11px] text-muted-foreground ${
+            className={`flex items-center gap-1 px-1 text-[11px] text-muted-foreground ${
               isUser ? "flex-row-reverse" : ""
             }`}
           >
-            <span>{formatTime(message.ts)}</span>
+            <ClientTime ts={message.ts} />
             {isUser && <CheckCheck className="h-3 w-3 text-primary" aria-label="Sent" />}
           </div>
         )}
@@ -334,8 +600,51 @@ function MessageBubble({ message }: { message: GroupedMessage }) {
   );
 }
 
+function PendingChip({
+  attachment,
+  onRemove,
+}: {
+  attachment: Attachment;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="group relative flex items-center gap-2 rounded-xl border border-border bg-secondary/70 py-1.5 pl-1.5 pr-3 shadow-[var(--shadow-card)]">
+      {attachment.kind === "image" ? (
+        <img
+          src={attachment.url}
+          alt={attachment.name}
+          className="h-10 w-10 rounded-lg object-cover"
+        />
+      ) : (
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-primary">
+          <FileText className="h-5 w-5" />
+        </span>
+      )}
+      <div className="min-w-0 max-w-[180px]">
+        <p className="truncate text-xs font-medium text-foreground">{attachment.name}</p>
+        <p className="text-[10px] text-muted-foreground">
+          {attachment.kind === "image" ? (
+            <span className="inline-flex items-center gap-1">
+              <ImageIcon className="h-3 w-3" /> Image · {formatBytes(attachment.size)}
+            </span>
+          ) : (
+            `${formatBytes(attachment.size)}`
+          )}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="ml-1 flex h-6 w-6 items-center justify-center rounded-full bg-card text-muted-foreground shadow-[var(--shadow-card)] transition-colors hover:bg-destructive hover:text-destructive-foreground"
+        aria-label={`Remove ${attachment.name}`}
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
 function bubbleRadius(isUser: boolean, first: boolean, last: boolean) {
-  // Pleasant grouped corners
   const base = "rounded-2xl";
   if (first && last) return base;
   if (isUser) {
@@ -387,6 +696,15 @@ function Dot({ delay }: { delay: string }) {
       style={{ animationDelay: delay }}
     />
   );
+}
+
+// Renders timestamp only after mount to avoid SSR/client locale mismatches.
+function ClientTime({ ts }: { ts: number }) {
+  const [label, setLabel] = useState<string>("");
+  useEffect(() => {
+    setLabel(ts ? formatTime(ts) : formatTime(Date.now()));
+  }, [ts]);
+  return <span suppressHydrationWarning>{label}</span>;
 }
 
 // Tiny safe inline markdown renderer (escapes HTML, then bold/italic)
