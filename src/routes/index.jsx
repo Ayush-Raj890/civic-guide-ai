@@ -59,12 +59,12 @@ const trust = [
 function Home() {
     return (<Layout>
       {/* Hero */}
-      <section className="relative overflow-hidden">
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
         <div className="absolute inset-0 -z-10" style={{ background: "var(--gradient-hero)" }} aria-hidden/>
-        <div className="absolute inset-0 -z-10 opacity-60" style={{ background: "var(--gradient-mesh)" }} aria-hidden/>
-        <div className="absolute inset-0 -z-10 opacity-40 [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_75%)]" style={{ background: "var(--grid-pattern)", backgroundSize: "40px 40px" }} aria-hidden/>
+        <div className="absolute inset-0 -z-10 opacity-40" style={{ background: "var(--gradient-mesh)" }} aria-hidden/>
+        <div className="absolute inset-0 -z-10 opacity-20 [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_75%)]" style={{ background: "var(--grid-pattern)", backgroundSize: "40px 40px" }} aria-hidden/>
 
-        <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 sm:px-6 md:grid-cols-2 md:py-24">
+        <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-20 sm:px-6 md:grid-cols-2 md:py-32 lg:px-8">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-card/80 px-3 py-1 text-xs font-medium text-primary shadow-[var(--shadow-card)] backdrop-blur">
               <Sparkles className="h-3.5 w-3.5"/> Smart Election Assistant
@@ -140,48 +140,51 @@ function Home() {
       </section>
 
       {/* Features grid */}
-      <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-wider text-primary">Features</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-            Everything you need to feel confident
-          </h2>
-          <p className="mt-3 text-muted-foreground">
-            Four friendly tools to guide you through every part of the election process.
-          </p>
-        </div>
-        <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {features.map((f) => (<div key={f.title} className="group relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition-all hover:-translate-y-1 hover:border-primary/30 hover:shadow-[var(--shadow-soft)]">
-              <div className={`absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br ${f.accent} blur-2xl opacity-60 transition-opacity group-hover:opacity-100`} aria-hidden/>
-              <div className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-primary ring-1 ring-primary/10">
-                <f.icon className="h-6 w-6"/>
-              </div>
-              <h3 className="relative mt-5 text-lg font-semibold">{f.title}</h3>
-              <p className="relative mt-2 text-sm text-muted-foreground">{f.desc}</p>
-            </div>))}
+      <section className="relative bg-gradient-to-b from-white via-blue-50/30 to-white dark:from-slate-900 dark:via-slate-900/50 dark:to-slate-900 py-24 sm:py-32">
+        <div className="absolute inset-0 -z-10 opacity-30" style={{ background: "var(--grid-pattern)", backgroundSize: "50px 50px" }} aria-hidden/>
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="text-sm font-semibold uppercase tracking-widest text-blue-600 dark:text-blue-400">Features</p>
+            <h2 className="mt-3 text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-5xl">
+              Everything you need to feel confident
+            </h2>
+            <p className="mt-4 text-lg text-gray-600 dark:text-gray-300">
+              Four friendly tools to guide you through every part of the election process.
+            </p>
+          </div>
+          <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            {features.map((f) => (<div key={f.title} className="group relative overflow-hidden rounded-2xl border border-gray-200 dark:border-slate-700 bg-gradient-to-br from-white to-blue-50/50 dark:from-slate-800 dark:to-slate-900 p-8 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 hover:border-blue-400 dark:hover:border-blue-500">
+                  <div className={`absolute -right-12 -top-12 h-40 w-40 rounded-full bg-gradient-to-br ${f.accent} blur-3xl opacity-40 transition-opacity duration-300 group-hover:opacity-60`} aria-hidden/>
+                  <div className="relative flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/40 dark:to-indigo-900/40 text-blue-600 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-800">
+                    <f.icon className="h-7 w-7"/>
+                  </div>
+                  <h3 className="relative mt-6 text-xl font-bold text-gray-900 dark:text-white">{f.title}</h3>
+                  <p className="relative mt-3 text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{f.desc}</p>
+                </div>))}
+          </div>
         </div>
       </section>
 
       {/* Process preview grid */}
-      <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
-        <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-[var(--shadow-card)]">
+      <section className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+        <div className="overflow-hidden rounded-3xl border border-gray-200 dark:border-slate-700 bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-slate-800 dark:to-slate-900 shadow-lg">
           <div className="grid gap-0 md:grid-cols-[1.1fr_1fr]">
-            <div className="relative p-8 sm:p-12">
-              <div className="absolute inset-0 -z-10 opacity-40" style={{ background: "var(--grid-pattern)", backgroundSize: "30px 30px" }} aria-hidden/>
-              <p className="text-sm font-semibold uppercase tracking-wider text-primary">
+            <div className="relative p-10 sm:p-14 bg-gradient-to-br from-indigo-600 to-blue-600 dark:from-indigo-900 dark:to-blue-900 text-white">
+              <div className="absolute inset-0 opacity-20" style={{ background: "var(--grid-pattern)", backgroundSize: "30px 30px" }} aria-hidden/>
+              <p className="relative text-sm font-semibold uppercase tracking-widest text-indigo-200 dark:text-indigo-300">
                 The Process
               </p>
-              <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-                5 phases. Zero confusion.
+              <h2 className="relative mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+                5 phases.<br/> Zero confusion.
               </h2>
-              <p className="mt-3 text-muted-foreground">
+              <p className="relative mt-4 text-indigo-100 dark:text-indigo-200 max-w-sm">
                 We break the election cycle into bite-sized steps so anyone can follow along.
               </p>
-              <Link to="/steps" className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[image:var(--gradient-primary)] px-5 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)] transition-transform hover:-translate-y-0.5">
+              <Link to="/steps" className="relative mt-8 inline-flex items-center gap-2 rounded-xl bg-white text-indigo-600 dark:bg-slate-900 dark:text-white px-6 py-3 text-sm font-semibold shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
                 See all steps <ArrowRight className="h-4 w-4"/>
               </Link>
             </div>
-            <div className="grid grid-cols-2 gap-px bg-border">
+            <div className="grid grid-cols-2 gap-px bg-gray-300 dark:bg-slate-600">
               {[
             { e: "📝", t: "Register" },
             { e: "📢", t: "Campaign" },
@@ -189,9 +192,9 @@ function Home() {
             { e: "🧮", t: "Count" },
             { e: "🏆", t: "Results" },
             { e: "✨", t: "Celebrate" },
-        ].map((p) => (<div key={p.t} className="flex flex-col items-center justify-center bg-card p-6 transition-colors hover:bg-secondary/60">
-                  <span className="text-3xl">{p.e}</span>
-                  <p className="mt-2 text-sm font-semibold">{p.t}</p>
+        ].map((p) => (<div key={p.t} className="flex flex-col items-center justify-center bg-white dark:bg-slate-800 p-8 transition-all duration-300 hover:bg-blue-50 dark:hover:bg-slate-700">
+                  <span className="text-4xl transition-transform group-hover:scale-110">{p.e}</span>
+                  <p className="mt-3 text-sm font-bold text-gray-900 dark:text-white">{p.t}</p>
                 </div>))}
             </div>
           </div>
@@ -199,23 +202,23 @@ function Home() {
       </section>
 
       {/* CTA */}
-      <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
-        <div className="relative overflow-hidden rounded-3xl border border-border bg-[image:var(--gradient-primary)] p-10 text-primary-foreground shadow-[var(--shadow-soft)] sm:p-14">
+      <section className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+        <div className="relative overflow-hidden rounded-3xl border border-indigo-200 dark:border-indigo-900 bg-gradient-to-br from-indigo-600 via-blue-500 to-purple-600 dark:from-indigo-950 dark:via-blue-950 dark:to-purple-950 p-12 text-white shadow-2xl">
           <div className="absolute inset-0 opacity-20" style={{
             backgroundImage: "linear-gradient(to right, white 1px, transparent 1px), linear-gradient(to bottom, white 1px, transparent 1px)",
             backgroundSize: "32px 32px",
             maskImage: "radial-gradient(ellipse at center, black 40%, transparent 75%)",
         }} aria-hidden/>
-          <div className="relative flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
-            <div className="max-w-xl">
-              <h2 className="text-3xl font-bold tracking-tight">
+          <div className="relative flex flex-col items-start justify-between gap-8 md:flex-row md:items-center">
+            <div className="max-w-2xl">
+              <h2 className="text-4xl font-bold tracking-tight sm:text-5xl">
                 Ready to become an informed voter?
               </h2>
-              <p className="mt-2 text-primary-foreground/85">
+              <p className="mt-3 text-lg text-indigo-100">
                 Walk through the 5 key election phases and get your questions answered.
               </p>
             </div>
-            <Link to="/steps" className="inline-flex items-center gap-2 rounded-xl bg-card px-6 py-3 text-sm font-semibold text-primary shadow-[var(--shadow-card)] transition-transform hover:-translate-y-0.5">
+            <Link to="/steps" className="inline-flex items-center gap-2 rounded-xl bg-white text-indigo-600 dark:bg-slate-900 dark:text-white px-8 py-4 text-sm font-semibold shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5 whitespace-nowrap">
               Explore the steps <ArrowRight className="h-4 w-4"/>
             </Link>
           </div>
