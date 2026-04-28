@@ -1,7 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Layout } from "@/components/Layout";
-import { ArrowRight, Sparkles, MessageCircle, ListChecks, Clock, ShieldCheck, Users, Globe2, HelpCircle, } from "lucide-react";
 import heroImg from "@/assets/hero-vote.jpg";
+import { Layout } from "@/components/Layout";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ArrowRight, Clock, Globe2, HelpCircle, ListChecks, MessageCircle, ShieldCheck, Sparkles, Users, } from "lucide-react";
 export const Route = createFileRoute("/")({
     head: () => ({
         meta: [
