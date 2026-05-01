@@ -12,7 +12,7 @@ const COUNTRIES = [
 ];
 
 export function Layout({ children }) {
-  const [country, setCountry] = useState("US");
+  const [country, setCountry] = useState("IN");
 
   useEffect(() => {
     try {
@@ -37,11 +37,11 @@ export function Layout({ children }) {
 
       <div className="fixed top-4 right-4 z-50">
         <label className="sr-only">Select country</label>
-        <div className="rounded-md border bg-white/80 px-2 py-1 shadow-sm backdrop-blur">
+        <div className="rounded-lg px-3.5 py-2 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-foreground border border-border bg-background/60 shadow-[var(--shadow-soft)] backdrop-blur">
           <select
             value={country}
             onChange={(e) => setCountry(e.target.value)}
-            className="bg-transparent text-sm outline-none"
+            className="bg-transparent text-sm outline-none cursor-pointer"
             aria-label="Select country"
           >
             {COUNTRIES.map((c) => (

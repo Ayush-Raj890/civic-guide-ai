@@ -3,8 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Layout } from "@/components/Layout";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Send, Bot, User, Sparkles, RotateCcw, CheckCheck, Paperclip, X, FileText, ImageIcon, Cloud, CloudOff, } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
-import { supabase } from "@/integrations/supabase/client";
+
 export const Route = createFileRoute("/chatbot")({
     head: () => ({
         meta: [
@@ -120,8 +119,6 @@ function readFileAsDataURL(file) {
     });
 }
 function ChatbotPage() {
-    const { user, loading: authLoading } = useAuth();
-    const [conversationId, setConversationId] = useState(null);
     const [historyLoaded, setHistoryLoaded] = useState(false);
     const [messages, setMessages] = useState([
         { id: "welcome", role: "bot", text: WELCOME_TEXT, ts: 0 },
@@ -136,83 +133,19 @@ function ChatbotPage() {
     const endRef = useRef(null);
     const inputRef = useRef(null);
     const fileInputRef = useRef(null);
-    // Load (or create) the user's most recent conversation when they sign in
+    // Load local history
     useEffect(() => {
-        let cancelled = false;
-        async function loadHistory() {
-            if (authLoading)
-                return;
-            if (!user) {
-                setConversationId(null);
-                setHistoryLoaded(true);
-                return;
+        try {
+            const saved = localStorage.getItem("civic_chat_history");
+            if (saved) {
+                setMessages(JSON.parse(saved));
             }
-            setHistoryLoaded(false);
-            const { data: convos } = await supabase
-                .from("conversations")
-                .select("id")
-                .eq("user_id", user.id)
-                .order("updated_at", { ascending: false })
-                .limit(1);
-            let convId = convos?.[0]?.id;
-            if (!convId) {
-                const { data: created, error: createErr } = await supabase
-                    .from("conversations")
-                    .insert({ user_id: user.id, title: "CivicGuide chat" })
-                    .select("id")
-                    .single();
-                if (createErr) {
-                    if (!cancelled)
-                        setError("Couldn't create your conversation.");
-                    return;
-                }
-                convId = created.id;
-            }
-            const { data: rows } = await supabase
-                .from("messages")
-                .select("id, role, content, created_at")
-                .eq("conversation_id", convId)
-                .order("created_at", { ascending: true });
-            if (cancelled)
-                return;
-            setConversationId(convId);
-            if (rows && rows.length) {
-                setMessages(rows.map((r) => ({
-                    id: r.id,
-                    role: r.role === "assistant" ? "bot" : r.role,
-                    text: r.content,
-                    ts: new Date(r.created_at).getTime(),
-                })));
-            }
-            else {
-                setMessages([{ id: "welcome", role: "bot", text: WELCOME_TEXT, ts: 0 }]);
-            }
-            setHistoryLoaded(true);
+        } catch (e) {
+            console.error("Failed to load local history", e);
         }
-        void loadHistory();
-        return () => {
-            cancelled = true;
-        };
-    }, [user, authLoading]);
-    async function persistMessage(role, content) {
-        if (!user || !conversationId)
-            return;
-        const dbRole = role === "bot" ? "assistant" : role;
-        const { error: insertErr } = await supabase.from("messages").insert({
-            conversation_id: conversationId,
-            user_id: user.id,
-            role: dbRole,
-            content,
-        });
-        if (insertErr) {
-            setError("Couldn't save message.");
-            return;
-        }
-        await supabase
-            .from("conversations")
-            .update({ updated_at: new Date().toISOString() })
-            .eq("id", conversationId);
-    }
+        setHistoryLoaded(true);
+    }, []);
+
     // Smooth auto-scroll only when user is near bottom
     useEffect(() => {
         const el = scrollRef.current;
@@ -220,9 +153,16 @@ function ChatbotPage() {
             return;
         const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
         if (distanceFromBottom < 200) {
-            endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+            el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
         }
     }, [messages, typing, pending.length]);
+
+    // Save messages to local storage
+    useEffect(() => {
+        if (historyLoaded) {
+            localStorage.setItem("civic_chat_history", JSON.stringify(messages));
+        }
+    }, [messages, historyLoaded]);
     // Auto-clear error after a moment
     useEffect(() => {
         if (!error)
@@ -292,9 +232,6 @@ function ChatbotPage() {
         setInput("");
         setPending([]);
         setTyping(true);
-        // Persist user message (best-effort)
-        if (trimmed)
-            void persistMessage("user", trimmed);
         const delay = 700 + Math.random() * 700;
         window.setTimeout(() => {
             const replyText = hasAttachments
@@ -317,7 +254,6 @@ function ChatbotPage() {
             setMessages((m) => [...m, botMsg]);
             setSuggestions(followups);
             setTyping(false);
-            void persistMessage("assistant", replyText);
             window.setTimeout(() => inputRef.current?.focus(), 50);
         }, delay);
     }
@@ -330,16 +266,7 @@ function ChatbotPage() {
         setSuggestions(initialSuggestions);
         setPending([]);
         setError(null);
-        // Start a fresh conversation for signed-in users
-        if (user) {
-            const { data: created } = await supabase
-                .from("conversations")
-                .insert({ user_id: user.id, title: "CivicGuide chat" })
-                .select("id")
-                .single();
-            if (created?.id)
-                setConversationId(created.id);
-        }
+        localStorage.removeItem("civic_chat_history");
         inputRef.current?.focus();
     }
     // Drag-and-drop
@@ -371,24 +298,24 @@ function ChatbotPage() {
         });
     }, [messages]);
     return (<Layout>
-      <section className="relative mx-auto max-w-3xl px-4 py-12 sm:px-6">
+      <section className="relative mx-auto max-w-4xl px-4 py-4 sm:px-6 flex flex-col h-[calc(100dvh-5rem)]">
         <div className="absolute inset-x-0 top-0 -z-10 h-72 opacity-50 [mask-image:linear-gradient(to_bottom,black,transparent)]" style={{ background: "var(--grid-pattern)", backgroundSize: "40px 40px" }} aria-hidden/>
         <div className="text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-card px-3 py-1 text-xs font-medium text-primary shadow-[var(--shadow-card)]">
             <Sparkles className="h-3.5 w-3.5"/> AI Assistant
           </span>
-          <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">
+          <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
             Chat with{" "}
             <span className="bg-[image:var(--gradient-primary)] bg-clip-text text-transparent">
               CivicGuide
             </span>
           </h1>
-          <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
+          <p className="mx-auto mt-1 max-w-xl text-sm text-muted-foreground">
             Ask anything about elections — from registering to vote to understanding results.
           </p>
         </div>
 
-        <div className={`relative mt-10 overflow-hidden rounded-3xl border bg-card shadow-[var(--shadow-soft)] transition-colors ${dragOver ? "border-primary ring-2 ring-primary/30" : "border-border"}`} onDrop={onDrop} onDragOver={onDragOver} onDragLeave={onDragLeave}>
+        <div className={`relative mt-4 flex-1 flex flex-col overflow-hidden rounded-3xl border bg-card/80 backdrop-blur-xl shadow-[var(--shadow-glow)] transition-colors ${dragOver ? "border-primary ring-2 ring-primary/30" : "border-border/50"}`} onDrop={onDrop} onDragOver={onDragOver} onDragLeave={onDragLeave}>
           {/* Drag overlay */}
           {dragOver && (<div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[var(--primary-soft)]/80 backdrop-blur-sm">
               <div className="rounded-2xl border-2 border-dashed border-primary bg-card px-6 py-4 text-center shadow-[var(--shadow-soft)]">
@@ -412,11 +339,9 @@ function ChatbotPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {user ? (<span className="hidden items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 sm:inline-flex">
-                  <Cloud className="h-3 w-3"/> Saved
-                </span>) : (<Link to="/auth" className="hidden items-center gap-1 rounded-full border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-[var(--primary-soft)] hover:text-primary sm:inline-flex">
-                  <CloudOff className="h-3 w-3"/> Sign in to save
-                </Link>)}
+              <span className="hidden items-center gap-1 rounded-full border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground sm:inline-flex">
+                <Cloud className="h-3 w-3"/> Local history
+              </span>
               <button type="button" onClick={reset} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-[var(--primary-soft)] hover:text-primary" aria-label="Reset conversation">
                 <RotateCcw className="h-3.5 w-3.5"/> Reset
               </button>
@@ -445,7 +370,7 @@ function ChatbotPage() {
               <span className="self-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Try asking:
               </span>
-              {suggestions.map((s) => (<button key={s} type="button" onClick={() => send(s)} disabled={typing} className="rounded-full border border-border bg-secondary px-3 py-1.5 text-xs font-medium text-foreground transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-[var(--primary-soft)] hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0">
+              {suggestions.map((s, i) => (<button key={s} type="button" onClick={() => send(s)} disabled={typing} style={{ animationDelay: `${i * 50}ms` }} className="animate-fade-up rounded-full border border-border/50 bg-secondary/80 px-4 py-2 text-xs font-medium text-foreground backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-[var(--primary-soft)] hover:text-primary hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0">
                   {s}
                 </button>))}
             </div>)}
@@ -465,7 +390,7 @@ function ChatbotPage() {
           </form>
         </div>
 
-        <p className="mt-4 text-center text-xs text-muted-foreground">
+        <p className="mt-2 shrink-0 text-center text-[10px] text-muted-foreground">
           Demo assistant · Attach screenshots or documents (max {MAX_FILES} files, 5 MB each).
           Files stay in your browser.
         </p>

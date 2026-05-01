@@ -13,7 +13,6 @@ import { Route as TimelineRouteImport } from './routes/timeline'
 import { Route as StepsRouteImport } from './routes/steps'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as ChatbotRouteImport } from './routes/chatbot'
-import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 
 const TimelineRoute = TimelineRouteImport.update({
@@ -36,11 +35,6 @@ const ChatbotRoute = ChatbotRouteImport.update({
   path: '/chatbot',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -49,7 +43,6 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/auth': typeof AuthRoute
   '/chatbot': typeof ChatbotRoute
   '/faq': typeof FaqRoute
   '/steps': typeof StepsRoute
@@ -57,7 +50,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/auth': typeof AuthRoute
   '/chatbot': typeof ChatbotRoute
   '/faq': typeof FaqRoute
   '/steps': typeof StepsRoute
@@ -66,7 +58,6 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/auth': typeof AuthRoute
   '/chatbot': typeof ChatbotRoute
   '/faq': typeof FaqRoute
   '/steps': typeof StepsRoute
@@ -74,15 +65,14 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/chatbot' | '/faq' | '/steps' | '/timeline'
+  fullPaths: '/' | '/chatbot' | '/faq' | '/steps' | '/timeline'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/chatbot' | '/faq' | '/steps' | '/timeline'
-  id: '__root__' | '/' | '/auth' | '/chatbot' | '/faq' | '/steps' | '/timeline'
+  to: '/' | '/chatbot' | '/faq' | '/steps' | '/timeline'
+  id: '__root__' | '/' | '/chatbot' | '/faq' | '/steps' | '/timeline'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AuthRoute: typeof AuthRoute
   ChatbotRoute: typeof ChatbotRoute
   FaqRoute: typeof FaqRoute
   StepsRoute: typeof StepsRoute
@@ -119,13 +109,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatbotRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -138,7 +121,6 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AuthRoute: AuthRoute,
   ChatbotRoute: ChatbotRoute,
   FaqRoute: FaqRoute,
   StepsRoute: StepsRoute,

@@ -1,10 +1,8 @@
 // @ts-nocheck
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Vote, LogOut, User as UserIcon, Menu, X } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
-import { supabase } from "@/integrations/supabase/client";
+import { LogOut, Menu, User as UserIcon, Vote, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useState, useEffect } from "react";
 
 const navItems = [
   { to: "/", label: "Home" },
@@ -15,7 +13,6 @@ const navItems = [
 ];
 
 export function Header() {
-  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -25,13 +22,6 @@ export function Header() {
     window.addEventListener("scroll", handler, { passive: true });
     return () => window.removeEventListener("scroll", handler);
   }, []);
-
-  async function handleSignOut() {
-    const { error } = await supabase.auth.signOut();
-    if (error) { toast.error(error.message); return; }
-    toast.success("Signed out");
-    navigate({ to: "/" });
-  }
 
   return (
     <header
@@ -75,30 +65,7 @@ export function Header() {
 
         {/* Right actions */}
         <div className="flex items-center gap-2">
-          {!loading && user ? (
-            <>
-              <span className="hidden items-center gap-1.5 rounded-lg bg-secondary px-3 py-1.5 text-xs font-medium text-foreground sm:inline-flex">
-                <UserIcon className="h-3.5 w-3.5" />
-                {user.email}
-              </span>
-              <button
-                onClick={handleSignOut}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition-all hover:bg-secondary hover:border-primary/20"
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Sign out</span>
-              </button>
-            </>
-          ) : (
-            !loading && (
-              <Link
-                to="/auth"
-                className="rounded-xl bg-[image:var(--gradient-primary)] px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)] transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-glow)]"
-              >
-                Sign in
-              </Link>
-            )
-          )}
+
 
           {/* Mobile hamburger */}
           <button

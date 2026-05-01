@@ -59,11 +59,7 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Hackathon badge */}
           <div className="flex flex-col items-start gap-3 sm:items-end">
-            <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-[var(--primary-soft)] px-3 py-1 text-xs font-semibold text-primary">
-              🏆 Built for Hackathon
-            </span>
             <p className="text-xs text-muted-foreground">{new Date().getFullYear()} · CivicGuide AI</p>
           </div>
         </div>
