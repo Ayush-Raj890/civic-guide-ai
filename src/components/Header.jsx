@@ -3,12 +3,16 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { LogOut, Menu, User as UserIcon, Vote, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { auth, googleProvider, analytics } from "@/lib/google-services";
+import { signInWithPopup, signOut } from "firebase/auth";
+import { logEvent } from "firebase/analytics";
 
 const navItems = [
   { to: "/", label: "Home" },
   { to: "/steps", label: "Steps" },
   { to: "/timeline", label: "Timeline" },
   { to: "/chatbot", label: "Chatbot" },
+  { to: "/finder", label: "Finder" },
   { to: "/faq", label: "FAQ" },
 ];
 
@@ -17,11 +21,38 @@ export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
+  const [user, setUser] = useState(null);
+
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 12);
     window.addEventListener("scroll", handler, { passive: true });
-    return () => window.removeEventListener("scroll", handler);
+    
+    // Auth Listener
+    const unsubscribe = auth.onAuthStateChanged((u) => {
+        setUser(u);
+    });
+
+    return () => {
+        window.removeEventListener("scroll", handler);
+        unsubscribe();
+    };
   }, []);
+
+  const login = async () => {
+    try {
+        await signInWithPopup(auth, googleProvider);
+        if (analytics) logEvent(analytics, "login", { method: "google" });
+        toast.success("Signed in successfully!");
+    } catch (err) {
+        console.error(err);
+        toast.error("Failed to sign in.");
+    }
+  };
+
+  const logout = async () => {
+    await signOut(auth);
+    toast.success("Signed out.");
+  };
 
   return (
     <header
@@ -65,7 +96,32 @@ export function Header() {
 
         {/* Right actions */}
         <div className="flex items-center gap-2">
-
+          {user ? (
+            <div className="flex items-center gap-3">
+              <div className="hidden flex-col items-end sm:flex">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Voter Profile</span>
+                <span className="text-xs font-semibold text-foreground">{user.displayName}</span>
+              </div>
+              <button 
+                onClick={logout}
+                className="group relative flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background transition-all hover:bg-secondary"
+                title="Sign out"
+              >
+                <img src={user.photoURL} alt="" className="h-6 w-6 rounded-full" />
+                <div className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-background ring-2 ring-background">
+                  <LogOut className="h-2.5 w-2.5 text-muted-foreground" />
+                </div>
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={login}
+              className="inline-flex items-center gap-2 rounded-lg bg-[image:var(--gradient-primary)] px-4 py-2 text-xs font-bold text-white shadow-[var(--shadow-soft)] transition-transform hover:-translate-y-0.5"
+            >
+              <UserIcon className="h-3.5 w-3.5" />
+              Sign In
+            </button>
+          )}
 
           {/* Mobile hamburger */}
           <button

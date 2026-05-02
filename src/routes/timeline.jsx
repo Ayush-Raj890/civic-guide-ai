@@ -71,7 +71,7 @@ const phases = [
   },
 ];
 
-function TimelinePage() {
+export function TimelinePage() {
   return (
     <Layout>
       <section className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8">

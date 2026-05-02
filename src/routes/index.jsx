@@ -92,7 +92,7 @@ const processPhases = [
   { e: "🎉", t: "Celebrate", color: "from-rose-500/10 to-pink-500/10" },
 ];
 
-function Home() {
+export function Home() {
   return (
     <Layout>
       {/* ── Hero ─────────────────────────────────────────── */}

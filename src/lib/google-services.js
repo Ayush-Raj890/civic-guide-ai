@@ -1,0 +1,35 @@
+import { initializeApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getAnalytics } from "firebase/analytics";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+// Firebase configuration using environment variables
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const googleProvider = new GoogleAuthProvider();
+
+// Initialize Analytics (optional, checks if window exists)
+export const analytics = typeof window !== "undefined" ? getAnalytics(app) : null;
+
+// Initialize Gemini AI
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
+export const geminiModel = genAI.getGenerativeModel({ 
+    model: "gemini-1.5-flash",
+    systemInstruction: "You are CivicGuide AI, a helpful and non-partisan civic assistant. Your goal is to help users understand elections, registration processes, and voting procedures. Keep answers concise, accurate, and encouraging."
+});
+
+// Maps Config
+export const MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
